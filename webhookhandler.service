@@ -1,0 +1,11 @@
+[Unit]
+Description=MicroMDM webhook handler
+Documentation=https://tarot.shortcut.ru/shortcut/micromdm-webhook-handler
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /etc/micromdm/webhookhandler/app.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

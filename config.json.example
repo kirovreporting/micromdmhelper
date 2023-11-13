@@ -1,0 +1,9 @@
+{
+    "token": "1234567890:AAAAAAA-AAAAAAAAAAAA-AAAAAAAAAAAAAA",
+    "chatID": 000000000,
+    "profilesPath": "/etc/micromdm/profiles/",
+    "micromdmCommandUrl": "https://your.micromdm.instance/v1/commands",
+    "micromdmApiPass":"lolkekcheb00rek",
+    "host": "117.0.0.42",
+    "port": 8008
+}
