@@ -1,6 +1,5 @@
 [Unit]
 Description=MicroMDM webhook handler
-Documentation=https://tarot.shortcut.ru/shortcut/micromdm-webhook-handler
 After=network.target
 
 [Service]
