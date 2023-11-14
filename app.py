@@ -1,5 +1,13 @@
 from flask import Flask, request, abort
-import requests, base64, os, json
+import requests, base64, os, json, logging
+
+current_working_directory = os.getcwd()
+logging.basicConfig(
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+    filename=f"{current_working_directory}/logs/micromdmhelper.log",
+)
 
 def response(request):
     if 'acknowledge_event' in request.json:
@@ -17,13 +25,13 @@ def response(request):
 
 def sendDocument(document,caption):
     method = "sendDocument"
-    urlTelegram = f"https://api.telegram.org/bot{TOKEN}/{method}"
+    urlTelegram = f"https://api.telegram.org/bot{TG_TOKEN}/{method}"
     file = open('payload.xml', 'wb')
     file.write(document)
     file.close()
     file = open('payload.xml', 'r')
     data = {
-                'chat_id': CHAT_ID,
+                'chat_id': TG_CHAT_ID,
                 'filename': "payload.xml",
                 'caption': caption
             }
@@ -31,9 +39,9 @@ def sendDocument(document,caption):
 
 def installAllProfiles(udid):
     urlMicromdmCommands = MICROMDM_COMMAND_URL
-    profiles = os.listdir(PROFILES_PATH);
+    profiles = os.listdir(PROFILES_PATH_DOCKER);
     for profile in profiles:
-        file = open(PROFILES_PATH+profile, 'r')
+        file = open(PROFILES_PATH_DOCKER+profile, 'r')
         profileBytes = bytes(file.read(), 'utf-8')
         profileEncoded = base64.b64encode(profileBytes)
         credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
@@ -49,15 +57,6 @@ def installAllProfiles(udid):
         response = requests.post(urlMicromdmCommands, headers=headers, data=json.dumps(data))
         print(response.text)
 
-def loadConfig():
-    try:
-        with open('config.json', 'r') as configFile:
-            global config
-            config = json.load(configFile)
-    except FileNotFoundError:
-        print("Config file not found")
-        exit()
-
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
@@ -66,16 +65,13 @@ def webhook():
     response(request)
     return ''
 
-config = None
-loadConfig()
-
-TOKEN = config["token"]
-CHAT_ID = config["chatID"]
-PROFILES_PATH = config["profilesPath"]
-MICROMDM_COMMAND_URL = config["micromdmCommandUrl"]
-MICROMDM_API_PASSWORD = config["micromdmApiPass"]
-HOST = config["host"]
-PORT = config["port"]
+TG_TOKEN = os.environ["TG_TOKEN"]
+TG_CHAT_ID = os.environ["TG_CHAT_ID"]
+PROFILES_PATH_DOCKER = os.environ.get(
+    "PROFILES_PATH_DOCKER", "/app/profiles"
+)
+MICROMDM_COMMAND_URL = os.environ["MICROMDM_COMMAND_URL"]
+MICROMDM_API_PASSWORD = os.environ["MICROMDM_API_PASSWORD"]
 
 if __name__ == '__main__':
-    app.run(host=HOST, port=PORT)
+    app.run(host="0.0.0.0", port="8008")
