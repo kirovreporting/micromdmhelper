@@ -10,7 +10,7 @@ logging.basicConfig(
     filename=f"{current_working_directory}/logs/micromdmhelper.log",
 )
 
-def response(request):
+def responseMicroMDM(request):
     if 'acknowledge_event' in request.json:
         if request.json['acknowledge_event']['status'] != 'Idle':
             payload = base64.b64decode(request.json['acknowledge_event']['raw_payload'])
@@ -27,6 +27,9 @@ def response(request):
         if request.json['topic'] == 'mdm.CheckOut':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
             sendDocument(payload, "Device deleted MDM profile!\nUDID: "+request.json['checkin_event']['udid'])
+
+def responseTelegram(request):
+    print(request.json['entities'])
 
 def sendDocument(document,caption):
     method = "sendDocument"
@@ -65,10 +68,16 @@ def installAllProfiles(udid):
 app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
-def webhook():
+def micromdmWebhook():
     print(request.json)
-    response(request)
+    responseMicroMDM(request)
     return ''
+
+@app.route('/', methods=['POST'])
+def telegramWebhook():
+    print(request.json)
+    responseTelegram(request)
+    return '', 200
 
 TG_TOKEN = os.environ["TG_TOKEN"]
 TG_CHAT_ID = os.environ["TG_CHAT_ID"]
