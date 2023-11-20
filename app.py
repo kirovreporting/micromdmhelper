@@ -43,7 +43,7 @@ def installAllProfiles(udid):
     profiles = os.listdir(PROFILES_PATH_DOCKER);
     for profile in profiles:
         file = open(PROFILES_PATH_DOCKER+profile, 'r')
-        profileBytes = bytes(file.read(), 'utf-8')
+        profileBytes = bytes(file.read())
         profileEncoded = base64.b64encode(profileBytes)
         credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
         headers = {
