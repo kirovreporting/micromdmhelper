@@ -83,7 +83,7 @@ TG_TOKEN = os.environ["TG_TOKEN"]
 TG_CHAT_ID = os.environ["TG_CHAT_ID"]
 TG_WHITELIST_IDS = os.environ["TG_WHITELIST_IDS"]
 PROFILES_PATH_DOCKER = os.environ.get(
-    "PROFILES_PATH_DOCKER", "/app/profiles"
+    "PROFILES_PATH_DOCKER", "/app/profiles/"
 )
 MICROMDM_COMMAND_URL = os.environ["MICROMDM_COMMAND_URL"]
 MICROMDM_API_PASSWORD = os.environ["MICROMDM_API_PASSWORD"]
