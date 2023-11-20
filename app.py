@@ -18,6 +18,7 @@ def response(request):
         if request.json['topic'] == 'mdm.Authenticate':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
             sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid'])
+        if request.json['topic'] == 'mdm.TokenUpdate':
             installAllProfiles(request.json['checkin_event']['udid'])
         if request.json['topic'] == 'mdm.CheckOut':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
