@@ -1,5 +1,6 @@
 from flask import Flask, request, abort
 import requests, base64, os, json, logging
+import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
 logging.basicConfig(
@@ -13,11 +14,14 @@ def response(request):
     if 'acknowledge_event' in request.json:
         if request.json['acknowledge_event']['status'] != 'Idle':
             payload = base64.b64decode(request.json['acknowledge_event']['raw_payload'])
-            sendDocument(payload, request.json['acknowledge_event']['command_uuid'])       
+            sendDocument(payload, request.json['acknowledge_event']['command_uuid'])
     if 'topic' in request.json:
         if request.json['topic'] == 'mdm.Authenticate':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
-            sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid'])
+            parsedPayload = XML.fromstring(payload)
+            computerSerial = parsedPayload[0][17].text
+            computerName = parsedPayload[0][5].text
+            sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid']+"\nSerial: "+computerSerial+"\nName: "+computerName)
         if request.json['topic'] == 'mdm.TokenUpdate':
             installAllProfiles(request.json['checkin_event']['udid'])
         if request.json['topic'] == 'mdm.CheckOut':
