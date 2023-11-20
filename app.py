@@ -68,6 +68,7 @@ def webhook():
 
 TG_TOKEN = os.environ["TG_TOKEN"]
 TG_CHAT_ID = os.environ["TG_CHAT_ID"]
+TG_WHITELIST_IDS = os.environ["TG_WHITELIST_IDS"]
 PROFILES_PATH_DOCKER = os.environ.get(
     "PROFILES_PATH_DOCKER", "/app/profiles"
 )
