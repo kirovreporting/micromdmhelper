@@ -12,6 +12,7 @@ ENVS:
 |-----------------------|---------|------------------------------------------------------------------------------------|
 | TG_TOKEN              |         | telegram bot token                                                                 |
 | TG_CHAT_ID            |         | telegram chat_id                                                                   |
+| TG_WHITELIST_IDS      |         | telegram ids of users allowed to send commands                                     |
 | PROFILES_PATH_DOCKER  |         | PATH profiles in docker                                                            |
 | MICROMDM_COMMAND_URL  |         | comands enpoint you micromdm, example: https://micromdm.youcompany.org/v1/commands |
 | MICROMDM_API_PASSWORD |         | micromdm api key                                                                   |
