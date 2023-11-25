@@ -47,7 +47,7 @@ def sendDocument(document,caption):
 
 def installAllProfiles(udid):
     urlMicromdmCommands = MICROMDM_COMMAND_URL
-    profiles = os.listdir(PROFILES_PATH_DOCKER);
+    profiles = os.listdir(PROFILES_PATH_DOCKER)
     for profile in profiles:
         file = open(PROFILES_PATH_DOCKER+profile, 'r')
         profileBytes = bytes(file.read(), 'utf-8')
@@ -69,13 +69,13 @@ app = Flask(__name__)
 
 @app.route('/webhook', methods=['POST'])
 def micromdmWebhook():
-    print(request.json)
+    logging.info(request.json)
     responseMicroMDM(request)
     return ''
 
 @app.route('/', methods=['POST'])
 def telegramWebhook():
-    print(request.json)
+    logging.info(request.json)
     responseTelegram(request)
     return '', 200
 
