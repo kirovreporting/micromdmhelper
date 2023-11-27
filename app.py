@@ -29,7 +29,35 @@ def responseMicroMDM(request):
             sendDocument(payload, "Device deleted MDM profile!\nUDID: "+request.json['checkin_event']['udid'])
 
 def responseTelegram(request):
-    print(request.json['entities'])
+    logging.info("Got message from telegram")
+    if 'message' in request.json:
+        if request.json['message']['from']['id'] in TG_WHITELIST_IDS:
+            messageEntities = ""
+            if 'caption_entities' in request.json['message']:
+                messageEntities = request.json['message']['caption_entities']
+            elif 'entities' in request.json['message']:
+                messageEntities = request.json['message']['entities']
+            if messageEntities != "":
+                logging.info("Message has entities")
+                for messageEntity in messageEntities:
+                    if messageEntity['type'] == "bot_command":
+                        if 'text' in request.json['message']:
+                            botCommand=request.json['message']['text'][messageEntity['offset']:messageEntity['length']]
+                        elif 'caption' in request.json['message']:
+                            botCommand=request.json['message']['caption'][messageEntity['offset']:messageEntity['length']]
+                        logging.info("Got command "+botCommand)
+                        if botCommand == "/uploadprofile":
+                            if 'document' in request.json['message']:
+                                filePath = getAttachedFilePath(request.json['message']['document']['file_id'])
+                                fileName = request.json['message']['document']['file_name']
+                                logging.info("File name "+fileName)
+                                downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
+                                sendMessage(request.json['message']['from']['id'],"Профиль загружен")
+                            else:
+                                sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
+        else:
+            logging.info("Sender is not in whitelist")
+
 
 def sendDocument(document,caption):
     method = "sendDocument"
@@ -44,6 +72,15 @@ def sendDocument(document,caption):
                 'caption': caption
             }
     requests.post(urlTelegram, data=data, files={'document': file}, stream=True)
+
+def sendMessage(chatID,text):
+    method = "sendMessage"
+    urlTelegram = f"https://api.telegram.org/bot{TG_TOKEN}/{method}"
+    data = {
+                'chat_id': chatID,
+                'text': text
+            }
+    requests.post(urlTelegram, data=data, stream=True)
 
 def installAllProfiles(udid):
     urlMicromdmCommands = MICROMDM_COMMAND_URL
@@ -64,8 +101,30 @@ def installAllProfiles(udid):
             }
         response = requests.post(urlMicromdmCommands, headers=headers, data=json.dumps(data))
         print(response.text)
+    
+def getAttachedFilePath(fileID):
+    url = f'https://api.telegram.org/bot{TG_TOKEN}/getFile'
+    params = {'file_id': fileID}
+    response = requests.get(url, params=params)
+    filePath = response.json()['result']['file_path']
+    return filePath
+
+def downloadAttachedFile(filePath,fileName,folderToSave):
+    url = f'https://api.telegram.org/file/bot{TG_TOKEN}/{filePath}'
+    logging.info("File from "+url)
+    response = requests.get(url)
+    with open(f"{folderToSave}/{fileName}", 'wb') as file:
+        logging.info(os.getcwd())
+        file.write(response.content)
 
 app = Flask(__name__)
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # log the exception
+    logging.exception('Exception occurred')
+    # return a custom error page or message
+    return render_template('error.html'), 500
 
 @app.route('/webhook', methods=['POST'])
 def micromdmWebhook():
@@ -81,7 +140,7 @@ def telegramWebhook():
 
 TG_TOKEN = os.environ["TG_TOKEN"]
 TG_CHAT_ID = os.environ["TG_CHAT_ID"]
-TG_WHITELIST_IDS = os.environ["TG_WHITELIST_IDS"]
+TG_WHITELIST_IDS = json.loads(os.environ["TG_WHITELIST_IDS"])
 PROFILES_PATH_DOCKER = os.environ.get(
     "PROFILES_PATH_DOCKER", "/app/profiles/"
 )
