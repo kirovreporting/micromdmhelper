@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-import requests, base64, os, json, logging
+import requests, base64, os, json, logging, sqlite3
 import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
@@ -50,11 +50,30 @@ def responseTelegram(request):
                             if 'document' in request.json['message']:
                                 filePath = getAttachedFilePath(request.json['message']['document']['file_id'])
                                 fileName = request.json['message']['document']['file_name']
-                                logging.info("File name "+fileName)
+                                logging.info("Downloading "+fileName)
                                 downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
+                                logging.info("Success")
                                 sendMessage(request.json['message']['from']['id'],"Профиль загружен")
                             else:
                                 sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
+                        if botCommand == "/lsprofiles":
+                            profiles = os.listdir(PROFILES_PATH_DOCKER)
+                            composedMessage = ""
+                            for profile in profiles:
+                                composedMessage += profile+"\n"
+                            sendMessage(request.json['message']['from']['id'],composedMessage)
+                        if botCommand == "/lsdevices":
+                            credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
+                            headers = {
+                                'Authorization': str.encode('Basic ')+credentialsEncoded,
+                                'Content-Type': 'application/json'
+                                }
+                            response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
+                            composedMessage = ""
+                            for device in response.json()['devices']:
+                                composedMessage+=device['serial_number']+"\n"
+                            sendMessage(request.json['message']['from']['id'],composedMessage)
+                            
         else:
             logging.info("Sender is not in whitelist")
 
@@ -83,7 +102,6 @@ def sendMessage(chatID,text):
     requests.post(urlTelegram, data=data, stream=True)
 
 def installAllProfiles(udid):
-    urlMicromdmCommands = MICROMDM_COMMAND_URL
     profiles = os.listdir(PROFILES_PATH_DOCKER)
     for profile in profiles:
         file = open(PROFILES_PATH_DOCKER+profile, 'r')
@@ -99,8 +117,8 @@ def installAllProfiles(udid):
                 'payload': bytes.decode(profileEncoded),
                 'request_type': "InstallProfile"
             }
-        response = requests.post(urlMicromdmCommands, headers=headers, data=json.dumps(data))
-        print(response.text)
+        response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
+        logging.info(response.text)
     
 def getAttachedFilePath(fileID):
     url = f'https://api.telegram.org/bot{TG_TOKEN}/getFile'
@@ -144,7 +162,7 @@ TG_WHITELIST_IDS = json.loads(os.environ["TG_WHITELIST_IDS"])
 PROFILES_PATH_DOCKER = os.environ.get(
     "PROFILES_PATH_DOCKER", "/app/profiles/"
 )
-MICROMDM_COMMAND_URL = os.environ["MICROMDM_COMMAND_URL"]
+MICROMDM_URL = os.environ["MICROMDM_URL"]
 MICROMDM_API_PASSWORD = os.environ["MICROMDM_API_PASSWORD"]
 
 if __name__ == '__main__':
