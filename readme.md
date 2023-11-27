@@ -5,6 +5,7 @@ It will:
 - try to install all files in the “profilesPath” folder as MDM profiles on devices right after registration.
 - send you a messages with the UID of the MicroMDM commands that have been sent and a .json file containing the details
 - notify you if someone has deleted the enrollment profile from the device
+- upload profiles to the “profilesPath” folder with /uploadprofile command
 
 ENVS:
 
