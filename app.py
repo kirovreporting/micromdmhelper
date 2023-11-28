@@ -18,9 +18,26 @@ def responseMicroMDM(request):
     if 'topic' in request.json:
         if request.json['topic'] == 'mdm.Authenticate':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
+            logging.info(payload)
             parsedPayload = XML.fromstring(payload)
             computerSerial = parsedPayload[0][17].text
             computerName = parsedPayload[0][5].text
+            computerUDID = parsedPayload[0][21].text
+            query = '''
+                INSERT INTO devices (serial, name, udid)
+                VALUES ("%s","%s","%s")
+                ''' % (computerSerial, computerName, computerUDID)
+            try:
+                execDBQuery(query)
+            except sqlite3.IntegrityError:
+                logging.info("Device exists in database, updating...")
+                query = '''
+                    UPDATE devices (name, udid)
+                    VALUES ("%s","%s")
+                    WHERE serial = "%s"
+                ''' % (computerName, computerUDID, computerSerial)
+            except Exception as e:
+                logging.log("Error occured: "+get_full_class_name(e))
             sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid']+"\nSerial: "+computerSerial+"\nName: "+computerName)
         if request.json['topic'] == 'mdm.TokenUpdate':
             installAllProfiles(request.json['checkin_event']['udid'])
@@ -42,9 +59,11 @@ def responseTelegram(request):
                 for messageEntity in messageEntities:
                     if messageEntity['type'] == "bot_command":
                         if 'text' in request.json['message']:
-                            botCommand=request.json['message']['text'][messageEntity['offset']:messageEntity['length']]
+                            botCommand = request.json['message']['text'][messageEntity['offset']:messageEntity['length']]
+                            commandArguments = request.json['message']['text'][messageEntity['offset']+messageEntity['length']:].split(" ")
                         elif 'caption' in request.json['message']:
-                            botCommand=request.json['message']['caption'][messageEntity['offset']:messageEntity['length']]
+                            botCommand = request.json['message']['caption'][messageEntity['offset']:messageEntity['length']]
+                            commandArguments = request.json['message']['caption'][messageEntity['offset']+messageEntity['length']:].split(" ")
                         logging.info("Got command "+botCommand)
                         if botCommand == "/uploadprofile":
                             if 'document' in request.json['message']:
@@ -69,14 +88,45 @@ def responseTelegram(request):
                                 'Content-Type': 'application/json'
                                 }
                             response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
-                            composedMessage = ""
-                            for device in response.json()['devices']:
-                                composedMessage+=device['serial_number']+"\n"
+                            composedMessage = "Name — Serial — UDID\n"
+                            for device in response.json()['devices']:                               
+                                nameQuery = '''
+                                    SELECT name
+                                    FROM devices
+                                    WHERE serial = "%s"
+                                    ''' % (device['serial_number'])
+                                try:
+                                    name = execDBQuery(nameQuery)[0]
+                                    if name is None:
+                                        name = ""
+                                except TypeError:
+                                    logging.info("There is some computer that is present in MicroMDM, but missinп in DB. Fixing...")
+                                    fixQuery = '''
+                                        INSERT INTO devices (serial, udid)
+                                        VALUES ("%s","%s")
+                                        ''' % (device['serial_number'], device['udid'])
+                                    execDBQuery(fixQuery)
+                                    name = ""
+                                udidQuery = '''
+                                    SELECT udid
+                                    FROM devices
+                                    WHERE serial = "%s"
+                                    ''' % (device['serial_number'])
+                                udid = execDBQuery(udidQuery)[0]
+                                composedMessage+=name+" — "+device['serial_number']+" — "+udid+"\n"
                             sendMessage(request.json['message']['from']['id'],composedMessage)
-                            
+                        if botCommand == "/installprofile":
+                            try:
+                                udid = commandArguments[1]
+                                logging.info(udid)
+                                profileName = commandArguments[2]
+                                logging.info("Sending profile "+profileName+" for UDID "+udid)
+                            except IndexError:
+                                sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
+                                return
+                            installProfile(udid,profileName)
         else:
             logging.info("Sender is not in whitelist")
-
 
 def sendDocument(document,caption):
     method = "sendDocument"
@@ -101,24 +151,31 @@ def sendMessage(chatID,text):
             }
     requests.post(urlTelegram, data=data, stream=True)
 
+def installProfile(udid,profileName):
+    file = open(PROFILES_PATH_DOCKER+"/"+profileName, 'r')
+    try:
+        profileBytes = bytes(file.read(), 'utf-8')
+    except:
+        logging.info("Error occured while encoding profile "+profileName)
+        return
+    profileEncoded = base64.b64encode(profileBytes)
+    credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
+    headers = {
+        'Authorization': str.encode('Basic ')+credentialsEncoded,
+        'Content-Type': 'application/json'
+        }
+    data = {
+            'udid': udid,
+            'payload': bytes.decode(profileEncoded),
+            'request_type': "InstallProfile"
+        }
+    response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
+    logging.info(response.text)
+
 def installAllProfiles(udid):
     profiles = os.listdir(PROFILES_PATH_DOCKER)
     for profile in profiles:
-        file = open(PROFILES_PATH_DOCKER+profile, 'r')
-        profileBytes = bytes(file.read(), 'utf-8')
-        profileEncoded = base64.b64encode(profileBytes)
-        credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
-        headers = {
-            'Authorization': str.encode('Basic ')+credentialsEncoded,
-            'Content-Type': 'application/json'
-            }
-        data = {
-                'udid': udid,
-                'payload': bytes.decode(profileEncoded),
-                'request_type': "InstallProfile"
-            }
-        response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
-        logging.info(response.text)
+        installProfile(udid,profile)
     
 def getAttachedFilePath(fileID):
     url = f'https://api.telegram.org/bot{TG_TOKEN}/getFile'
@@ -135,6 +192,21 @@ def downloadAttachedFile(filePath,fileName,folderToSave):
         logging.info(os.getcwd())
         file.write(response.content)
 
+def execDBQuery(query):
+    db = sqlite3.connect(DB_PATH) 
+    dbCursor = db.cursor()
+    dbCursor.execute(query)
+    result = dbCursor.fetchone()
+    db.commit()
+    db.close()
+    return result
+
+def get_full_class_name(obj):
+    module = obj.__class__.__module__
+    if module is None or module == str.__class__.__module__:
+        return obj.__class__.__name__
+    return module + '.' + obj.__class__.__name__
+
 app = Flask(__name__)
 
 @app.errorhandler(Exception)
@@ -142,7 +214,7 @@ def handle_exception(e):
     # log the exception
     logging.exception('Exception occurred')
     # return a custom error page or message
-    return render_template('error.html'), 500
+    return '', 500
 
 @app.route('/webhook', methods=['POST'])
 def micromdmWebhook():
@@ -164,6 +236,14 @@ PROFILES_PATH_DOCKER = os.environ.get(
 )
 MICROMDM_URL = os.environ["MICROMDM_URL"]
 MICROMDM_API_PASSWORD = os.environ["MICROMDM_API_PASSWORD"]
+RESOURCES_PATH_DOCKER = os.environ["RESOURCES_PATH_DOCKER"]
+DB_PATH = RESOURCES_PATH_DOCKER+"/db.sqlite3"
+
+initializeDB= '''
+    CREATE TABLE IF NOT EXISTS devices
+    ([serial] TEXT PRIMARY KEY, [name] TEXT, [udid] TEXT)
+    '''
+execDBQuery(initializeDB)
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port="8008")
