@@ -241,7 +241,7 @@ DB_PATH = RESOURCES_PATH_DOCKER+"/db.sqlite3"
 
 initializeDB= '''
     CREATE TABLE IF NOT EXISTS devices
-    ([serial] TEXT PRIMARY KEY, [name] TEXT, [udid] TEXT)
+    ([serial] TEXT PRIMARY KEY, [name] TEXT, [udid] TEXT, [fvRecoveryKey] TEXT, [activationLockCodeBypassCode] TEXT)
     '''
 execDBQuery(initializeDB)
 
