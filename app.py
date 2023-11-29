@@ -228,6 +228,8 @@ def telegramWebhook():
     responseTelegram(request)
     return '', 200
 
+BIND_HOST = os.environ["BIND_HOST"]
+BIND_PORT = os.environ["BIND_PORT"]
 TG_TOKEN = os.environ["TG_TOKEN"]
 TG_CHAT_ID = os.environ["TG_CHAT_ID"]
 TG_WHITELIST_IDS = json.loads(os.environ["TG_WHITELIST_IDS"])
@@ -246,4 +248,4 @@ initializeDB= '''
 execDBQuery(initializeDB)
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port="8008")
+    app.run(host=BIND_HOST, port=BIND_PORT)
