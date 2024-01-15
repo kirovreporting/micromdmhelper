@@ -7,4 +7,4 @@ ADD . /app/
 RUN mkdir /app/logs && chown -R python_runner /app
 RUN pip3 install -r requirements.txt
 USER python_runner
-CMD ["python3", "/app/app.py"]
+CMD ["/app/dockerWrapper.sh"]
