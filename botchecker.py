@@ -21,15 +21,19 @@ def checkBot(token,offset):
                 'limit': 1,
                 'timeout': 30
             }
-    response = requests.post("https://api.telegram.org/bot{TG_TOKEN}/getUpdates", data=json.dumps(data))
-    if 'result' in response.json():
-        os.remove(f'{RESOURCES_PATH_DOCKER}/{offset}.offset')
-        offset = response.json()['result']['update_id']
-        with open(f'{RESOURCES_PATH_DOCKER}/{offset}.offset', 'r'):
-                pass
-        return response.json
+    response = requests.post(f'https://api.telegram.org/bot{TG_TOKEN}/getUpdates', data=json.dumps(data))
+    logging.info(response.json())
+    if 'result' in response.json(): 
+        if 'update_id' in response.json()['result'] :
+            os.remove(f'{RESOURCES_PATH_DOCKER}/{offset}.offset')
+            offset = int(response.json()['result']['update_id'])
+            with open(f'{RESOURCES_PATH_DOCKER}/{offset}.offset', 'r'):
+                    pass
+            return response.json
+        else:
+            return None
     else:
-         return None
+        return None
 
 def sendToBot(jsonData):
     response = requests.post(f'{BIND_HOST}:{BIND_PORT}/', data=jsonData)
@@ -41,7 +45,7 @@ def sendToBot(jsonData):
 logging.info("POST checker is active")
     
 while True:
-    logging.info("Starting POST check with offset "+offset)
+    logging.info("Starting POST check with offset "+str(offset))
     check=checkBot(TG_TOKEN,offset)
     if check:
         logging.info("Sending POST response to main app")
