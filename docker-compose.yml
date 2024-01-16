@@ -4,7 +4,6 @@ services:
       context: .
     volumes:
     - './profiles:${PROFILES_PATH_DOCKER:-/app/profiles}'
-    - './logs:${LOGS_PATH_DOCKER:-/app/logs}'
     - './resources:${RESOURCES_PATH_DOCKER:-/app/resources}'
     ports:
       - '${BIND_HOST:-0.0.0.0}:${BIND_PORT:-8008}:8008'

@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-import requests, base64, os, json, logging, sqlite3
+import requests, base64, os, sys, json, logging, sqlite3
 import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
@@ -7,7 +7,7 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
-    filename=f"{current_working_directory}/logs/micromdmhelper.log",
+    stream=sys.stdout,
 )
 
 def responseMicroMDM(request):
