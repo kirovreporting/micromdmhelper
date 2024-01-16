@@ -1,4 +1,12 @@
-import requests, json, os
+import requests, json, os, logging, sys
+
+current_working_directory = os.getcwd()
+logging.basicConfig(
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
 
 TG_TOKEN = os.environ.get("TG_TOKEN")
 BIND_HOST = os.environ.get("BIND_HOST")
@@ -30,7 +38,12 @@ def sendToBot(jsonData):
     else:
         return False
     
+logging.info("POST checker is active")
+    
 while True:
+    logging.info("Starting POST check with offset "+offset)
     check=checkBot(TG_TOKEN,offset)
     if check:
+        logging.info("Sending POST response to main app")
+        logging.info(check)
         sendToBot(check)
