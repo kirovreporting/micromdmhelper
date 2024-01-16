@@ -4,7 +4,10 @@
 python3 /app/app.py &
 
 # Start the second process
-python3 /app/botchecker.py &
+if [[ $TG_POST_MODE == 1 ]]
+then
+    python3 /app/botchecker.py &
+fi
 
 # Wait for any process to exit
 wait -n
