@@ -80,6 +80,8 @@ def responseTelegram(request):
                             composedMessage = ""
                             for profile in profiles:
                                 composedMessage += profile+"\n"
+                            if composedMessage == "":
+                                composedMessage = "No profiles uploaded"
                             sendMessage(request.json['message']['from']['id'],composedMessage)
                         if botCommand == "/lsdevices":
                             credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
