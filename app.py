@@ -4,7 +4,7 @@ import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
 logging.basicConfig(
-    format="%(asctime)s %(levelname)-8s %(message)s",
+    format="%(asctime)s main %(levelname)-8s %(message)s",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
     stream=sys.stdout,
@@ -47,6 +47,7 @@ def responseMicroMDM(request):
 
 def responseTelegram(request):
     logging.info("Got message from telegram")
+    logging.info(request.json)
     if 'message' in request.json:
         if request.json['message']['from']['id'] in TG_WHITELIST_IDS:
             messageEntities = ""
@@ -220,13 +221,11 @@ def handle_exception(e):
 
 @app.route('/webhook', methods=['POST'])
 def micromdmWebhook():
-    logging.info(request.json)
     responseMicroMDM(request)
     return ''
 
 @app.route('/', methods=['POST'])
 def telegramWebhook():
-    logging.info(request.json)
     responseTelegram(request)
     return '', 200
 
