@@ -1,8 +1,8 @@
-import requests, json, os, logging, sys
+import requests, json, os, logging, sys,time
 
 current_working_directory = os.getcwd()
 logging.basicConfig(
-    format="%(asctime)s %(levelname)-8s %(message)s",
+    format="%(asctime)s botchecker %(levelname)-8s %(message)s",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
     stream=sys.stdout,
@@ -15,39 +15,41 @@ RESOURCES_PATH_DOCKER = os.environ["RESOURCES_PATH_DOCKER"]
 
 offset = 0
 
-def checkBot(token,offset):
+def checkBot(token):
+    global offset
     data = {
-                'offset': offset,
-                'limit': 1,
-                'timeout': 30
+                'offset': int(offset),
+                'timeout': 50
             }
-    response = requests.post(f'https://api.telegram.org/bot{TG_TOKEN}/getUpdates', data=json.dumps(data))
-    logging.info(response.json())
-    if 'result' in response.json(): 
-        if 'update_id' in response.json()['result'] :
-            os.remove(f'{RESOURCES_PATH_DOCKER}/{offset}.offset')
-            offset = int(response.json()['result']['update_id'])
-            with open(f'{RESOURCES_PATH_DOCKER}/{offset}.offset', 'r'):
-                    pass
-            return response.json
-        else:
-            return None
-    else:
-        return None
+    headers={
+        'Content-type':'application/json'
+    }
+    logging.debug(data)
+    response = requests.post(f'https://api.telegram.org/bot{TG_TOKEN}/getUpdates', data=json.dumps(data), timeout=None, headers=headers)
+    logging.debug(response.json())
+    updates = response.json()['result']
+    for update in updates:
+        logging.info("Got update, now forwarding...")
+        if sendToBot(update):
+            offset = int(update['update_id'])
+            logging.info(f'Update {offset} delivered')
+            offset += 1
+    logging.debug("New offset is "+str(offset))
 
-def sendToBot(jsonData):
-    response = requests.post(f'{BIND_HOST}:{BIND_PORT}/', data=jsonData)
+
+def sendToBot(data):
+    urlApp = f'http://{BIND_HOST}:{BIND_PORT}/'
+    headers={
+        'Content-type':'application/json'
+    }
+    response = requests.post(urlApp, data=json.dumps(data), headers=headers)
     if response.status_code == 200:
         return True
     else:
         return False
     
 logging.info("POST checker is active")
-    
+time.sleep(3)
 while True:
-    logging.info("Starting POST check with offset "+str(offset))
-    check=checkBot(TG_TOKEN,offset)
-    if check:
-        logging.info("Sending POST response to main app")
-        logging.info(check)
-        sendToBot(check)
+    logging.debug("Starting POST check with offset "+str(offset))
+    checkBot(TG_TOKEN)
