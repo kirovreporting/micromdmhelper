@@ -83,7 +83,7 @@ def responseTelegram(request):
                                 profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
                                 parsedProfile = plistlib.loads(profileFile)
                                 profileID = parsedProfile["PayloadIdentifier"]
-                                composedMessage += " - "+profileID+"\n"
+                                composedMessage += " - `"+profileID+"`\n"
                             if composedMessage == "":
                                 composedMessage = "No profiles uploaded"
                             else:
@@ -121,7 +121,7 @@ def responseTelegram(request):
                                     WHERE serial = "%s"
                                     ''' % (device['serial_number'])
                                 udid = execDBQuery(udidQuery)[0]
-                                composedMessage+=name+" — "+device['serial_number']+" — "+udid+"\n"
+                                composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
                             sendMessage(request.json['message']['from']['id'],composedMessage)
                         if botCommand == "/installprofile":
                             try:
@@ -155,7 +155,8 @@ def sendMessage(chatID,text):
     urlTelegram = f"https://api.telegram.org/bot{TG_TOKEN}/{method}"
     data = {
                 'chat_id': chatID,
-                'text': text
+                'text': text,
+                'parse_mode': 'Markdown'
             }
     requests.post(urlTelegram, data=data, stream=True)
 
