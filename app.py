@@ -79,8 +79,7 @@ def responseTelegram(request):
                         if botCommand == "/rmprofile":
                             try:
                                 udid = commandArguments[1]
-                                logging.info(udid)
-                                profileName = commandArguments[2]
+                                profileName = " ".join(commandArguments[2:])
                                 logging.info("Removing profile "+profileName+" from UDID "+udid)
                             except IndexError:
                                 sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
@@ -141,8 +140,7 @@ def responseTelegram(request):
                         if botCommand == "/installprofile":
                             try:
                                 udid = commandArguments[1]
-                                logging.info(udid)
-                                profileName = commandArguments[2]
+                                profileName = " ".join(commandArguments[2:])
                                 logging.info("Sending profile "+profileName+" for UDID "+udid)
                             except IndexError:
                                 sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
@@ -199,7 +197,7 @@ def installProfile(udid,profileName):
 def removeProfile(udid,profileName):
     profileID = ""
     try:
-        profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
+        profileFile = open(PROFILES_PATH_DOCKER+"/"+profileName, "rb").read()
         parsedProfile = plistlib.loads(profileFile)
         profileID = parsedProfile["PayloadIdentifier"]
     except:
