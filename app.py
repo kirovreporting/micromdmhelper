@@ -95,7 +95,7 @@ def responseTelegram(request):
                                     if profileName == "!!!ALL!!!":
                                         profiles = os.listdir(PROFILES_PATH_DOCKER)
                                         for profile in profiles:
-                                            removeProfile(device,profile)
+                                            removeProfile(device[0],profile)
                                     else:
                                         removeProfile(device[0],profileName)
                             elif profileName == "!!!ALL!!!":
@@ -116,7 +116,7 @@ def responseTelegram(request):
                             if composedMessage == "":
                                 composedMessage = "No profiles uploaded"
                             else:
-                                composedMessage = "Filename - Identifier\n" + composedMessage
+                                composedMessage = "Filename\n" + composedMessage
                             sendMessage(request.json['message']['from']['id'],composedMessage)
                         if botCommand == "/lsdevices":
                             credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
@@ -175,7 +175,7 @@ def responseTelegram(request):
                                     if profileName == "!!!ALL!!!":
                                         profiles = os.listdir(PROFILES_PATH_DOCKER)
                                         for profile in profiles:
-                                            installProfile(device,profile)
+                                            installProfile(device[0],profile)
                                     else:
                                         installProfile(device[0],profileName)
                             elif profileName == "!!!ALL!!!":
