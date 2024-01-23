@@ -76,6 +76,16 @@ def responseTelegram(request):
                                 sendMessage(request.json['message']['from']['id'],"Профиль загружен")
                             else:
                                 sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
+                        if botCommand == "/rmprofile":
+                            try:
+                                udid = commandArguments[1]
+                                logging.info(udid)
+                                profileName = commandArguments[2]
+                                logging.info("Removing profile "+profileName+" from UDID "+udid)
+                            except IndexError:
+                                sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
+                                return
+                            removeProfile(udid,profileName)
                         if botCommand == "/lsprofiles":
                             profiles = os.listdir(PROFILES_PATH_DOCKER)
                             composedMessage = ""
@@ -182,6 +192,28 @@ def installProfile(udid,profileName):
             'udid': udid,
             'payload': bytes.decode(profileEncoded),
             'request_type': "InstallProfile"
+        }
+    response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
+    logging.info(response.text)
+
+def removeProfile(udid,profileName):
+    profileID = ""
+    try:
+        profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
+        parsedProfile = plistlib.loads(profileFile)
+        profileID = parsedProfile["PayloadIdentifier"]
+    except:
+        logging.info("Error occured while reading profile "+profileName)
+        return
+    credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
+    headers = {
+        'Authorization': str.encode('Basic ')+credentialsEncoded,
+        'Content-Type': 'application/json'
+        }
+    data = {
+            'udid': udid,
+            'identifier': profileID,
+            'request_type': "RemoveProfile"
         }
     response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
     logging.info(response.text)
