@@ -84,7 +84,26 @@ def responseTelegram(request):
                             except IndexError:
                                 sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
                                 return
-                            removeProfile(udid,profileName)
+                            if udid == "!!!ALL!!!":
+                                udidQuery = '''
+                                    SELECT udid
+                                    FROM devices
+                                    '''
+                                udids = execDBQuery(udidQuery)
+                                for device in udids:
+                                    logging.info(device)
+                                    if profileName == "!!!ALL!!!":
+                                        profiles = os.listdir(PROFILES_PATH_DOCKER)
+                                        for profile in profiles:
+                                            removeProfile(device,profile)
+                                    else:
+                                        removeProfile(device[0],profileName)
+                            elif profileName == "!!!ALL!!!":
+                                profiles = os.listdir(PROFILES_PATH_DOCKER)
+                                for profile in profiles:
+                                    removeProfile(udid,profile)
+                            else:
+                                removeProfile(udid,profileName)
                         if botCommand == "/lsprofiles":
                             profiles = os.listdir(PROFILES_PATH_DOCKER)
                             composedMessage = ""
@@ -114,7 +133,7 @@ def responseTelegram(request):
                                     WHERE serial = "%s"
                                     ''' % (device['serial_number'])
                                 try:
-                                    name = execDBQuery(nameQuery)[0]
+                                    name = execDBQuery(nameQuery)[0][0]
                                     if name is None:
                                         name = ""
                                 except TypeError:
@@ -130,7 +149,7 @@ def responseTelegram(request):
                                     FROM devices
                                     WHERE serial = "%s"
                                     ''' % (device['serial_number'])
-                                udid = execDBQuery(udidQuery)[0]
+                                udid = execDBQuery(udidQuery)[0][0]
                                 composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
                             if composedMessage == "":
                                 composedMessage = "No devices enrolled"
@@ -145,6 +164,26 @@ def responseTelegram(request):
                             except IndexError:
                                 sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
                                 return
+                            if udid == "!!!ALL!!!":
+                                udidQuery = '''
+                                    SELECT udid
+                                    FROM devices
+                                    '''
+                                udids = execDBQuery(udidQuery)
+                                for device in udids:
+                                    logging.info(device)
+                                    if profileName == "!!!ALL!!!":
+                                        profiles = os.listdir(PROFILES_PATH_DOCKER)
+                                        for profile in profiles:
+                                            installProfile(device,profile)
+                                    else:
+                                        installProfile(device[0],profileName)
+                            elif profileName == "!!!ALL!!!":
+                                profiles = os.listdir(PROFILES_PATH_DOCKER)
+                                for profile in profiles:
+                                    installProfile(udid,profile)
+                            else:
+                                installProfile(udid,profileName)
                             installProfile(udid,profileName)
         else:
             logging.info("Sender is not in whitelist")
@@ -240,7 +279,7 @@ def execDBQuery(query):
     db = sqlite3.connect(DB_PATH) 
     dbCursor = db.cursor()
     dbCursor.execute(query)
-    result = dbCursor.fetchone()
+    result = dbCursor.fetchall()
     db.commit()
     db.close()
     return result
