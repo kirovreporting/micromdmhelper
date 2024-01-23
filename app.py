@@ -1,5 +1,5 @@
 from flask import Flask, request, abort
-import requests, base64, os, sys, json, logging, sqlite3
+import requests, base64, os, sys, json, logging, sqlite3, plistlib
 import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
@@ -78,11 +78,16 @@ def responseTelegram(request):
                                 sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
                         if botCommand == "/lsprofiles":
                             profiles = os.listdir(PROFILES_PATH_DOCKER)
-                            composedMessage = ""
                             for profile in profiles:
-                                composedMessage += profile+"\n"
+                                composedMessage += profile
+                                profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
+                                parsedProfile = plistlib.loads(profileFile)
+                                profileID = parsedProfile["PayloadIdentifier"]
+                                composedMessage += " - "+profileID+"\n"
                             if composedMessage == "":
                                 composedMessage = "No profiles uploaded"
+                            else:
+                                composedMessage = "Filename - Identifier\n" + composedMessage
                             sendMessage(request.json['message']['from']['id'],composedMessage)
                         if botCommand == "/lsdevices":
                             credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
