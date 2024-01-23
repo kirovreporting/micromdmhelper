@@ -213,7 +213,11 @@ def sendMessage(chatID,text):
     requests.post(urlTelegram, data=data, stream=True)
 
 def installProfile(udid,profileName):
-    file = open(PROFILES_PATH_DOCKER+"/"+profileName, 'r')
+    try:
+        file = open(PROFILES_PATH_DOCKER+"/"+profileName, 'r')
+    except:
+        logging.info("Error occured while reading profile "+profileName)
+        return
     try:
         profileBytes = bytes(file.read(), 'utf-8')
     except:
