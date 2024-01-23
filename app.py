@@ -73,16 +73,16 @@ def responseTelegram(request):
                                 logging.info("Downloading "+fileName)
                                 downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
                                 logging.info("Success")
-                                sendMessage(request.json['message']['from']['id'],"Профиль загружен")
+                                sendMessage(request.json['message']['chat']['id'],"Профиль загружен")
                             else:
-                                sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
+                                sendMessage(request.json['message']['chat']['id'],"Нет профиля для загрузки")
                         if botCommand == "/rmprofile":
                             try:
                                 udid = commandArguments[1]
                                 profileName = " ".join(commandArguments[2:])
                                 logging.info("Removing profile "+profileName+" from UDID "+udid)
                             except IndexError:
-                                sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
+                                sendMessage(request.json['message']['chat']['id'],"This command needs two args (udid & profile name) separated by a space")
                                 return
                             if udid == "!!!ALL!!!":
                                 udidQuery = '''
@@ -117,7 +117,7 @@ def responseTelegram(request):
                                 composedMessage = "No profiles uploaded"
                             else:
                                 composedMessage = "Filename\n" + composedMessage
-                            sendMessage(request.json['message']['from']['id'],composedMessage)
+                            sendMessage(request.json['message']['chat']['id'],composedMessage)
                         if botCommand == "/lsdevices":
                             credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
                             headers = {
@@ -155,14 +155,14 @@ def responseTelegram(request):
                                 composedMessage = "No devices enrolled"
                             else:
                                 composedMessage = "Name — Serial — UDID\n" + composedMessage
-                            sendMessage(request.json['message']['from']['id'],composedMessage)
+                            sendMessage(request.json['message']['chat']['id'],composedMessage)
                         if botCommand == "/installprofile":
                             try:
                                 udid = commandArguments[1]
                                 profileName = " ".join(commandArguments[2:])
                                 logging.info("Sending profile "+profileName+" for UDID "+udid)
                             except IndexError:
-                                sendMessage(request.json['message']['from']['id'],"This command needs two args (udid & profile name) separated by a space")
+                                sendMessage(request.json['message']['chat']['id'],"This command needs two args (udid & profile name) separated by a space")
                                 return
                             if udid == "!!!ALL!!!":
                                 udidQuery = '''
