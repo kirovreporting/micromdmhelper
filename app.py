@@ -78,6 +78,7 @@ def responseTelegram(request):
                                 sendMessage(request.json['message']['from']['id'],"Нет профиля для загрузки")
                         if botCommand == "/lsprofiles":
                             profiles = os.listdir(PROFILES_PATH_DOCKER)
+                            composedMessage = ""
                             for profile in profiles:
                                 composedMessage += profile
                                 profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
@@ -96,7 +97,7 @@ def responseTelegram(request):
                                 'Content-Type': 'application/json'
                                 }
                             response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
-                            composedMessage = "Name — Serial — UDID\n"
+                            composedMessage = ""
                             for device in response.json()['devices']:                               
                                 nameQuery = '''
                                     SELECT name
@@ -122,6 +123,10 @@ def responseTelegram(request):
                                     ''' % (device['serial_number'])
                                 udid = execDBQuery(udidQuery)[0]
                                 composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
+                            if composedMessage == "":
+                                composedMessage = "No devices enrolled"
+                            else:
+                                composedMessage = "Name — Serial — UDID\n" + composedMessage
                             sendMessage(request.json['message']['from']['id'],composedMessage)
                         if botCommand == "/installprofile":
                             try:
