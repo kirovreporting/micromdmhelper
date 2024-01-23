@@ -108,11 +108,11 @@ def responseTelegram(request):
                             profiles = os.listdir(PROFILES_PATH_DOCKER)
                             composedMessage = ""
                             for profile in profiles:
-                                composedMessage += profile
-                                profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
-                                parsedProfile = plistlib.loads(profileFile)
-                                profileID = parsedProfile["PayloadIdentifier"]
-                                composedMessage += " - `"+profileID+"`\n"
+                                composedMessage += "`"+profile+"`"
+                                # profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
+                                # parsedProfile = plistlib.loads(profileFile)
+                                # profileID = parsedProfile["PayloadIdentifier"]
+                                composedMessage += "\n"
                             if composedMessage == "":
                                 composedMessage = "No profiles uploaded"
                             else:
