@@ -37,7 +37,7 @@ def responseMicroMDM(request):
                     WHERE serial = "%s"
                 ''' % (computerName, computerUDID, computerSerial)
             except Exception as e:
-                logging.log("Error occured: "+get_full_class_name(e))
+                logging.exception("Error occured: "+get_full_class_name(e), exc_info=e)
             sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid']+"\nSerial: "+computerSerial+"\nName: "+computerName)
         if request.json['topic'] == 'mdm.TokenUpdate':
             installAllProfiles(request.json['checkin_event']['udid'])
@@ -126,32 +126,36 @@ def responseTelegram(request):
                                 }
                             response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
                             composedMessage = ""
-                            for device in response.json()['devices']:                               
-                                nameQuery = '''
-                                    SELECT name
-                                    FROM devices
-                                    WHERE serial = "%s"
-                                    ''' % (device['serial_number'])
-                                try:
-                                    name = execDBQuery(nameQuery)[0][0]
-                                    if name is None:
+                            try:
+                                for device in response.json()['devices']:                               
+                                    nameQuery = '''
+                                        SELECT name
+                                        FROM devices
+                                        WHERE serial = "%s"
+                                        ''' % (device['serial_number'])
+                                    try:
+                                        name = execDBQuery(nameQuery)[0][0]
+                                        if name is None:
+                                            name = ""
+                                    except (TypeError, IndexError):
+                                        logging.info("There is some device that is present in MicroMDM, but missinп in DB. Fixing...")
+                                        fixQuery = '''
+                                            INSERT INTO devices (serial, udid)
+                                            VALUES ("%s","%s")
+                                            ''' % (device['serial_number'], device['udid'])
+                                        execDBQuery(fixQuery)
                                         name = ""
-                                except TypeError:
-                                    logging.info("There is some computer that is present in MicroMDM, but missinп in DB. Fixing...")
-                                    fixQuery = '''
-                                        INSERT INTO devices (serial, udid)
-                                        VALUES ("%s","%s")
-                                        ''' % (device['serial_number'], device['udid'])
-                                    execDBQuery(fixQuery)
-                                    name = ""
-                                udidQuery = '''
-                                    SELECT udid
-                                    FROM devices
-                                    WHERE serial = "%s"
-                                    ''' % (device['serial_number'])
-                                udid = execDBQuery(udidQuery)[0][0]
-                                composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
-                            if composedMessage == "":
+                                    except Exception as e:
+                                        logging.exception("Exception occured while reading DB query output: "+get_full_class_name(e), exc_info=e)
+                                    udidQuery = '''
+                                        SELECT udid
+                                        FROM devices
+                                        WHERE serial = "%s"
+                                        ''' % (device['serial_number'])
+                                    udid = execDBQuery(udidQuery)[0][0]
+                                    composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
+                            except:
+                                logging.exception("Error occured: "+get_full_class_name(e), exc_info=e)
                                 composedMessage = "No devices enrolled"
                             else:
                                 composedMessage = "Name — Serial — UDID\n" + composedMessage
@@ -215,13 +219,13 @@ def sendMessage(chatID,text):
 def installProfile(udid,profileName):
     try:
         file = open(PROFILES_PATH_DOCKER+"/"+profileName, 'r')
-    except:
-        logging.info("Error occured while reading profile "+profileName)
+    except Exception as e:
+        logging.info("Error occured while reading profile "+profileName, exc_info=e)
         return
     try:
         profileBytes = bytes(file.read(), 'utf-8')
-    except:
-        logging.info("Error occured while encoding profile "+profileName)
+    except Exception as e:
+        logging.exception("Error occured while encoding profile "+profileName, exc_info=e)
         return
     profileEncoded = base64.b64encode(profileBytes)
     credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
@@ -243,8 +247,8 @@ def removeProfile(udid,profileName):
         profileFile = open(PROFILES_PATH_DOCKER+"/"+profileName, "rb").read()
         parsedProfile = plistlib.loads(profileFile)
         profileID = parsedProfile["PayloadIdentifier"]
-    except:
-        logging.info("Error occured while reading profile "+profileName)
+    except Exception as e:
+        logging.exception("Error occured while reading profile "+profileName, exc_info=e)
         return
     credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
     headers = {
