@@ -65,7 +65,6 @@ def responseTelegram(request):
                         elif 'caption' in request.json['message']:
                             botCommand = request.json['message']['caption'][messageEntity['offset']:messageEntity['length']]
                             commandArguments = request.json['message']['caption'][messageEntity['offset']+messageEntity['length']:].split(" ")
-                        logging.info("Got command "+botCommand)
                         if 'document' in request.json['message']:
                             document = request.json['message']['document']
                         else:
@@ -181,7 +180,22 @@ def getFullClassName(obj):
         return obj.__class__.__name__
     return module + '.' + obj.__class__.__name__
 
+def getGroupUUIDList(name):
+    devicesUUID = []
+    match name:
+        case "!all":
+            udidQuery = '''
+                SELECT udid
+                FROM devices
+                '''
+            queryResult = execDBQuery(udidQuery)
+            for record in queryResult:
+                devicesUUID.append(record[0])
+    return devicesUUID
+
+
 def mdmCommand(name,chat,arguments,document):
+    logging.info("Got command "+name)
     match name:
         case "/lsprofiles":
             profiles = os.listdir(PROFILES_PATH_DOCKER)
@@ -205,26 +219,18 @@ def mdmCommand(name,chat,arguments,document):
             except IndexError:
                 sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
                 return
-            if udid == "!!!ALL!!!":
-                udidQuery = '''
-                    SELECT udid
-                    FROM devices
-                    '''
-                udids = execDBQuery(udidQuery)
-                for device in udids:
-                    logging.info(device)
-                    if profileName == "!!!ALL!!!":
-                        profiles = os.listdir(PROFILES_PATH_DOCKER)
-                        for profile in profiles:
-                            removeProfile(device[0],profile)
-                    else:
-                        removeProfile(device[0],profileName)
-            elif profileName == "!!!ALL!!!":
-                profiles = os.listdir(PROFILES_PATH_DOCKER)
-                for profile in profiles:
-                    removeProfile(udid,profile)
+            if udid[0] == "!":
+                devices = getGroupUUIDList(udid)
             else:
-                removeProfile(udid,profileName)
+                devices[0] = udid
+            for device in devices:
+                logging.info(device)
+                if profileName == "!!!ALL!!!":
+                    profiles = os.listdir(PROFILES_PATH_DOCKER)
+                    for profile in profiles:
+                        removeProfile(device[0],profile)
+                else:
+                    removeProfile(device[0],profileName)
         case "/uploadprofile":
             if document:
                 filePath = getAttachedFilePath(document['file_id'])
@@ -232,9 +238,9 @@ def mdmCommand(name,chat,arguments,document):
                 logging.info("Downloading "+fileName)
                 downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
                 logging.info("Success")
-                sendMessage(chat,"Профиль загружен")
+                sendMessage(chat,"Profile uploaded")
             else:
-                sendMessage(chat,"Нет профиля для загрузки")
+                sendMessage(chat,"No profile to upload")
         case "/lsdevices":
             headers = {
                 'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
@@ -283,28 +289,27 @@ def mdmCommand(name,chat,arguments,document):
             except IndexError:
                 sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
                 return
-            if udid == "!!!ALL!!!":
-                udidQuery = '''
-                    SELECT udid
-                    FROM devices
-                    '''
-                udids = execDBQuery(udidQuery)
-                for device in udids:
-                    logging.info(device)
-                    if profileName == "!!!ALL!!!":
-                        profiles = os.listdir(PROFILES_PATH_DOCKER)
-                        for profile in profiles:
-                            installProfile(device[0],profile)
-                    else:
-                        installProfile(device[0],profileName)
-            elif profileName == "!!!ALL!!!":
-                profiles = os.listdir(PROFILES_PATH_DOCKER)
-                for profile in profiles:
-                    installProfile(udid,profile)
+            if udid[0] == "!":
+                devices = getGroupUUIDList(udid)
             else:
-                installProfile(udid,profileName)
-            installProfile(udid,profileName)
-                
+                devices[0] = udid
+            for device in devices:
+                logging.info(device)
+                if profileName == "!all":
+                    profiles = os.listdir(PROFILES_PATH_DOCKER)
+                    for profile in profiles:
+                        installProfile(device,profile)
+                else:
+                    installProfile(device,profileName)
+        case "/restartdevice":
+            try:
+                udid = arguments[1]
+                profileName = " ".join(arguments[2:])
+            except IndexError:
+                sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
+                return
+        case _:
+            sendMessage(chat,"Unknown command")
 
 
 app = Flask(__name__)
