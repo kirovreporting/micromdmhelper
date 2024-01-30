@@ -1,5 +1,6 @@
-from flask import Flask, request, abort, plistlib
-import requests, base64, os, sys, json, logging, sqlite3, plistlib
+from flask import Flask, request, abort
+import requests, base64, os, sys, json, logging, sqlite3, plistlib, xml.etree.ElementTree as XML
+
 
 current_working_directory = os.getcwd()
 logging.basicConfig(
@@ -10,6 +11,7 @@ logging.basicConfig(
 )
 
 def responseMicroMDM(request):
+    logging.info(request.json)
     if 'acknowledge_event' in request.json:
         if request.json['acknowledge_event']['status'] != 'Idle':
             payload = base64.b64decode(request.json['acknowledge_event']['raw_payload'])
@@ -18,28 +20,66 @@ def responseMicroMDM(request):
         if request.json['topic'] == 'mdm.Authenticate':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
             logging.info(payload)
-            parsedPayload = plistlib.loads(payload, fmt=FMT_XML, dict_type=dict)
-            computerSerial = parsedPayload["SerialNumber"]
-            computerName = parsedPayload["DeviceName"]
-            computerUDID = parsedPayload["UDID"]
-            query = '''
-                INSERT INTO devices (serial, name, udid)
-                VALUES ("%s","%s","%s")
-                ''' % (computerSerial, computerName, computerUDID)
-            try:
-                execDBQuery(query)
-            except sqlite3.IntegrityError:
-                logging.info("Device exists in database, updating...")
+            parsedPayload = parsePlist(payload)
+            if "Mac" in parsedPayload["ProductName"]:
+                computerSerial = parsedPayload["SerialNumber"]
+                computerName = parsedPayload["DeviceName"]
+                computerUDID = parsedPayload["UDID"]
                 query = '''
-                    UPDATE devices (name, udid)
+                    INSERT INTO devices (serial, name, udid)
+                    VALUES ("%s","%s","%s")
+                    ''' % (computerSerial, computerName, computerUDID)
+                try:
+                    execDBQuery(query)
+                except sqlite3.IntegrityError:
+                    logging.info("Device exists in database, updating...")
+                    query = '''
+                        UPDATE devices 
+                        SET name = "%s",
+                            udid = "%s"
+                        WHERE serial = "%s"
+                    ''' % (computerName, computerUDID, computerSerial)
+                except Exception as e:
+                    logging.exception("Error occured: "+getFullClassName(e), exc_info=e)
+                sendDocument(payload, "Computer registered!\nUDID: "+computerUDID+"\nSerial: "+computerSerial+"\nName: "+computerName)
+            else:
+                deviceSerial = parsedPayload["SerialNumber"]
+                deviceUDID = parsedPayload["UDID"]
+                deviceModel = parsedPayload["ProductName"]
+                query = '''
+                    INSERT INTO devices (serial, udid)
                     VALUES ("%s","%s")
-                    WHERE serial = "%s"
-                ''' % (computerName, computerUDID, computerSerial)
-            except Exception as e:
-                logging.exception("Error occured: "+getFullClassName(e), exc_info=e)
-            sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid']+"\nSerial: "+computerSerial+"\nName: "+computerName)
+                    ''' % (deviceSerial, deviceUDID)
+                try:
+                    execDBQuery(query)
+                except sqlite3.IntegrityError:
+                    logging.info("Device exists in database, updating...")
+                    query = '''
+                        UPDATE devices
+                        SET udid = '{0}'
+                        WHERE serial = '{1}'
+                    '''.format(deviceUDID, deviceSerial)
+                    execDBQuery(query)
+                except Exception as e:
+                    logging.exception("Error occured: "+getFullClassName(e), exc_info=e)
+                sendDocument(payload, "Device registered!\nUDID: "+deviceUDID+"\nSerial: "+deviceSerial+"\nModel: "+deviceModel)
+                installAllProfiles(request.json['checkin_event']['udid'])
         if request.json['topic'] == 'mdm.TokenUpdate':
-            installAllProfiles(request.json['checkin_event']['udid'])
+            deviceUDID = request.json['checkin_event']['udid']
+            payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
+            parsedPayload = parsePlist(payload)
+            logging.info(parsedPayload)
+            if "UnlockToken" in parsedPayload:
+                logging.info("Got unlock token for "+deviceUDID)
+                mdmToken = parsedPayload["Token"]
+                unlockToken = parsedPayload["UnlockToken"]
+                query = '''
+                            UPDATE devices
+                            SET mdmToken = '{0}',
+                                unlockToken = '{1}'
+                            WHERE udid = '{2}'
+                        '''.format(mdmToken, unlockToken, deviceUDID)
+                execDBQuery(query)
         if request.json['topic'] == 'mdm.CheckOut':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
             sendDocument(payload, "Device deleted MDM profile!\nUDID: "+request.json['checkin_event']['udid'])
@@ -175,13 +215,28 @@ def downloadAttachedFile(filePath,fileName,folderToSave):
         file.write(response.content)
 
 def execDBQuery(query):
-    db = sqlite3.connect(DB_PATH) 
-    dbCursor = db.cursor()
-    dbCursor.execute(query)
-    result = dbCursor.fetchall()
-    db.commit()
-    db.close()
-    return result
+    logging.info(query)
+    db = sqlite3.connect(DB_PATH)
+    try: 
+        dbCursor = db.cursor()
+        dbCursor.execute(query)
+        result = dbCursor.fetchall()
+        db.commit()
+        db.close()
+        return result
+    except Exception as e:
+        db.close()
+        raise e
+
+def parsePlist(xml):
+    parsedPayload = XML.fromstring(xml)
+    dictionary = {}
+    for i in range(0,len(parsedPayload[0]),2):
+        key=parsedPayload[0][i].text
+        value=parsedPayload[0][i+1].text
+        if value is not None: value = value.strip().replace("\n\t", "")
+        dictionary.update({key: value})
+    return dictionary
 
 def getFullClassName(obj):
     module = obj.__class__.__module__
@@ -363,7 +418,7 @@ DB_PATH = RESOURCES_PATH_DOCKER+"/db.sqlite3"
 
 initializeDB= '''
     CREATE TABLE IF NOT EXISTS devices
-    ([serial] TEXT PRIMARY KEY, [name] TEXT, [udid] TEXT, [fvRecoveryKey] TEXT, [activationLockCodeBypassCode] TEXT)
+    ([serial] TEXT PRIMARY KEY, [name] TEXT, [udid] TEXT, [fvRecoveryKey] TEXT, [activationLockCodeBypassCode] TEXT, [mdmToken] TEXT, [unlockToken] TEXT)
     '''
 execDBQuery(initializeDB)
 
