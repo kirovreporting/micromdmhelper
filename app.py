@@ -1,6 +1,5 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, plistlib
 import requests, base64, os, sys, json, logging, sqlite3, plistlib
-import xml.etree.ElementTree as XML
 
 current_working_directory = os.getcwd()
 logging.basicConfig(
@@ -19,10 +18,10 @@ def responseMicroMDM(request):
         if request.json['topic'] == 'mdm.Authenticate':
             payload = base64.b64decode(request.json['checkin_event']['raw_payload'])
             logging.info(payload)
-            parsedPayload = XML.fromstring(payload)
-            computerSerial = parsedPayload[0][17].text
-            computerName = parsedPayload[0][5].text
-            computerUDID = parsedPayload[0][21].text
+            parsedPayload = plistlib.loads(payload, fmt=FMT_XML, dict_type=dict)
+            computerSerial = parsedPayload["SerialNumber"]
+            computerName = parsedPayload["DeviceName"]
+            computerUDID = parsedPayload["UDID"]
             query = '''
                 INSERT INTO devices (serial, name, udid)
                 VALUES ("%s","%s","%s")
@@ -110,9 +109,8 @@ def installProfile(udid,profileName):
         logging.exception("Error occured while encoding profile "+profileName, exc_info=e)
         return
     profileEncoded = base64.b64encode(profileBytes)
-    credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
     headers = {
-        'Authorization': str.encode('Basic ')+credentialsEncoded,
+        'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
         'Content-Type': 'application/json'
         }
     data = {
@@ -132,15 +130,26 @@ def removeProfile(udid,profileName):
     except Exception as e:
         logging.exception("Error occured while reading profile "+profileName, exc_info=e)
         return
-    credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
     headers = {
-        'Authorization': str.encode('Basic ')+credentialsEncoded,
+        'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
         'Content-Type': 'application/json'
         }
     data = {
             'udid': udid,
             'identifier': profileID,
             'request_type': "RemoveProfile"
+        }
+    response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
+    logging.info(response.text)
+
+def restartDevice(udid):
+    headers = {
+        'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
+        'Content-Type': 'application/json'
+        }
+    data = {
+            'udid': udid,
+            'request_type': "RestartDevice"
         }
     response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
     logging.info(response.text)
@@ -306,8 +315,15 @@ def mdmCommand(name,chat,arguments,document):
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
             except IndexError:
-                sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
+                sendMessage(chat,"This command needs device uuid to work")
                 return
+            if udid[0] == "!":
+                devices = getGroupUUIDList(udid)
+            else:
+                devices[0] = udid
+            for device in devices:
+                logging.info(device)
+                restartDevice(device)
         case _:
             sendMessage(chat,"Unknown command")
 
