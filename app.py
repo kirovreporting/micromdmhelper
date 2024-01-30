@@ -37,7 +37,7 @@ def responseMicroMDM(request):
                     WHERE serial = "%s"
                 ''' % (computerName, computerUDID, computerSerial)
             except Exception as e:
-                logging.exception("Error occured: "+get_full_class_name(e), exc_info=e)
+                logging.exception("Error occured: "+getFullClassName(e), exc_info=e)
             sendDocument(payload, "Device registered!\nUDID: "+request.json['checkin_event']['udid']+"\nSerial: "+computerSerial+"\nName: "+computerName)
         if request.json['topic'] == 'mdm.TokenUpdate':
             installAllProfiles(request.json['checkin_event']['udid'])
@@ -66,129 +66,11 @@ def responseTelegram(request):
                             botCommand = request.json['message']['caption'][messageEntity['offset']:messageEntity['length']]
                             commandArguments = request.json['message']['caption'][messageEntity['offset']+messageEntity['length']:].split(" ")
                         logging.info("Got command "+botCommand)
-                        if botCommand == "/uploadprofile":
-                            if 'document' in request.json['message']:
-                                filePath = getAttachedFilePath(request.json['message']['document']['file_id'])
-                                fileName = request.json['message']['document']['file_name']
-                                logging.info("Downloading "+fileName)
-                                downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
-                                logging.info("Success")
-                                sendMessage(request.json['message']['chat']['id'],"Профиль загружен")
-                            else:
-                                sendMessage(request.json['message']['chat']['id'],"Нет профиля для загрузки")
-                        if botCommand == "/rmprofile":
-                            try:
-                                udid = commandArguments[1]
-                                profileName = " ".join(commandArguments[2:])
-                                logging.info("Removing profile "+profileName+" from UDID "+udid)
-                            except IndexError:
-                                sendMessage(request.json['message']['chat']['id'],"This command needs two args (udid & profile name) separated by a space")
-                                return
-                            if udid == "!!!ALL!!!":
-                                udidQuery = '''
-                                    SELECT udid
-                                    FROM devices
-                                    '''
-                                udids = execDBQuery(udidQuery)
-                                for device in udids:
-                                    logging.info(device)
-                                    if profileName == "!!!ALL!!!":
-                                        profiles = os.listdir(PROFILES_PATH_DOCKER)
-                                        for profile in profiles:
-                                            removeProfile(device[0],profile)
-                                    else:
-                                        removeProfile(device[0],profileName)
-                            elif profileName == "!!!ALL!!!":
-                                profiles = os.listdir(PROFILES_PATH_DOCKER)
-                                for profile in profiles:
-                                    removeProfile(udid,profile)
-                            else:
-                                removeProfile(udid,profileName)
-                        if botCommand == "/lsprofiles":
-                            profiles = os.listdir(PROFILES_PATH_DOCKER)
-                            composedMessage = ""
-                            for profile in profiles:
-                                composedMessage += "`"+profile+"`"
-                                # profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
-                                # parsedProfile = plistlib.loads(profileFile)
-                                # profileID = parsedProfile["PayloadIdentifier"]
-                                composedMessage += "\n"
-                            if composedMessage == "":
-                                composedMessage = "No profiles uploaded"
-                            else:
-                                composedMessage = "Filename\n" + composedMessage
-                            sendMessage(request.json['message']['chat']['id'],composedMessage)
-                        if botCommand == "/lsdevices":
-                            credentialsEncoded = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
-                            headers = {
-                                'Authorization': str.encode('Basic ')+credentialsEncoded,
-                                'Content-Type': 'application/json'
-                                }
-                            response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
-                            composedMessage = ""
-                            try:
-                                for device in response.json()['devices']:                               
-                                    nameQuery = '''
-                                        SELECT name
-                                        FROM devices
-                                        WHERE serial = "%s"
-                                        ''' % (device['serial_number'])
-                                    try:
-                                        name = execDBQuery(nameQuery)[0][0]
-                                        if name is None:
-                                            name = ""
-                                    except (TypeError, IndexError):
-                                        logging.info("There is some device that is present in MicroMDM, but missinп in DB. Fixing...")
-                                        fixQuery = '''
-                                            INSERT INTO devices (serial, udid)
-                                            VALUES ("%s","%s")
-                                            ''' % (device['serial_number'], device['udid'])
-                                        execDBQuery(fixQuery)
-                                        name = ""
-                                    except Exception as e:
-                                        logging.exception("Exception occured while reading DB query output: "+get_full_class_name(e), exc_info=e)
-                                    udidQuery = '''
-                                        SELECT udid
-                                        FROM devices
-                                        WHERE serial = "%s"
-                                        ''' % (device['serial_number'])
-                                    udid = execDBQuery(udidQuery)[0][0]
-                                    composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
-                            except:
-                                logging.exception("Error occured: "+get_full_class_name(e), exc_info=e)
-                                composedMessage = "No devices enrolled"
-                            else:
-                                composedMessage = "Name — Serial — UDID\n" + composedMessage
-                            sendMessage(request.json['message']['chat']['id'],composedMessage)
-                        if botCommand == "/installprofile":
-                            try:
-                                udid = commandArguments[1]
-                                profileName = " ".join(commandArguments[2:])
-                                logging.info("Sending profile "+profileName+" for UDID "+udid)
-                            except IndexError:
-                                sendMessage(request.json['message']['chat']['id'],"This command needs two args (udid & profile name) separated by a space")
-                                return
-                            if udid == "!!!ALL!!!":
-                                udidQuery = '''
-                                    SELECT udid
-                                    FROM devices
-                                    '''
-                                udids = execDBQuery(udidQuery)
-                                for device in udids:
-                                    logging.info(device)
-                                    if profileName == "!!!ALL!!!":
-                                        profiles = os.listdir(PROFILES_PATH_DOCKER)
-                                        for profile in profiles:
-                                            installProfile(device[0],profile)
-                                    else:
-                                        installProfile(device[0],profileName)
-                            elif profileName == "!!!ALL!!!":
-                                profiles = os.listdir(PROFILES_PATH_DOCKER)
-                                for profile in profiles:
-                                    installProfile(udid,profile)
-                            else:
-                                installProfile(udid,profileName)
-                            installProfile(udid,profileName)
+                        if 'document' in request.json['message']:
+                            document = request.json['message']['document']
+                        else:
+                            document = None
+                        mdmCommand(botCommand,request.json['message']['chat']['id'],commandArguments,document)
         else:
             logging.info("Sender is not in whitelist")
 
@@ -217,6 +99,7 @@ def sendMessage(chatID,text):
     requests.post(urlTelegram, data=data, stream=True)
 
 def installProfile(udid,profileName):
+    logging.info("Sending profile "+profileName+" for UDID "+udid)
     try:
         file = open(PROFILES_PATH_DOCKER+"/"+profileName, 'r')
     except Exception as e:
@@ -292,11 +175,137 @@ def execDBQuery(query):
     db.close()
     return result
 
-def get_full_class_name(obj):
+def getFullClassName(obj):
     module = obj.__class__.__module__
     if module is None or module == str.__class__.__module__:
         return obj.__class__.__name__
     return module + '.' + obj.__class__.__name__
+
+def mdmCommand(name,chat,arguments,document):
+    match name:
+        case "/lsprofiles":
+            profiles = os.listdir(PROFILES_PATH_DOCKER)
+            composedMessage = ""
+            for profile in profiles:
+                composedMessage += "`"+profile+"`"
+                # profileFile = open(PROFILES_PATH_DOCKER+"/"+profile, "rb").read()
+                # parsedProfile = plistlib.loads(profileFile)
+                # profileID = parsedProfile["PayloadIdentifier"]
+                composedMessage += "\n"
+            if composedMessage == "":
+                composedMessage = "No profiles uploaded"
+            else:
+                composedMessage = "Filename\n" + composedMessage
+            sendMessage(chat,composedMessage)
+        case "/rmprofile":
+            try:
+                udid = arguments[1]
+                profileName = " ".join(arguments[2:])
+                logging.info("Removing profile "+profileName+" from UDID "+udid)
+            except IndexError:
+                sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
+                return
+            if udid == "!!!ALL!!!":
+                udidQuery = '''
+                    SELECT udid
+                    FROM devices
+                    '''
+                udids = execDBQuery(udidQuery)
+                for device in udids:
+                    logging.info(device)
+                    if profileName == "!!!ALL!!!":
+                        profiles = os.listdir(PROFILES_PATH_DOCKER)
+                        for profile in profiles:
+                            removeProfile(device[0],profile)
+                    else:
+                        removeProfile(device[0],profileName)
+            elif profileName == "!!!ALL!!!":
+                profiles = os.listdir(PROFILES_PATH_DOCKER)
+                for profile in profiles:
+                    removeProfile(udid,profile)
+            else:
+                removeProfile(udid,profileName)
+        case "/uploadprofile":
+            if document:
+                filePath = getAttachedFilePath(document['file_id'])
+                fileName = document['file_name']
+                logging.info("Downloading "+fileName)
+                downloadAttachedFile(filePath,fileName,PROFILES_PATH_DOCKER)
+                logging.info("Success")
+                sendMessage(chat,"Профиль загружен")
+            else:
+                sendMessage(chat,"Нет профиля для загрузки")
+        case "/lsdevices":
+            headers = {
+                'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
+                'Content-Type': 'application/json'
+                }
+            response = requests.post(MICROMDM_URL+"/v1/devices", headers=headers, data="{}")
+            composedMessage = ""
+            try:
+                for device in response.json()['devices']:                               
+                    nameQuery = '''
+                        SELECT name
+                        FROM devices
+                        WHERE serial = "%s"
+                        ''' % (device['serial_number'])
+                    try:
+                        name = execDBQuery(nameQuery)[0][0]
+                        if name is None:
+                            name = ""
+                    except (TypeError, IndexError):
+                        logging.info("There is some device that is present in MicroMDM, but missinп in DB. Fixing...")
+                        fixQuery = '''
+                            INSERT INTO devices (serial, udid)
+                            VALUES ("%s","%s")
+                            ''' % (device['serial_number'], device['udid'])
+                        execDBQuery(fixQuery)
+                        name = ""
+                    except Exception as e:
+                        logging.exception("Exception occured while reading DB query output: "+getFullClassName(e), exc_info=e)
+                    udidQuery = '''
+                        SELECT udid
+                        FROM devices
+                        WHERE serial = "%s"
+                        ''' % (device['serial_number'])
+                    udid = execDBQuery(udidQuery)[0][0]
+                    composedMessage+=name+" — "+device['serial_number']+" — `"+udid+"`\n"
+            except:
+                logging.exception("Error occured: "+getFullClassName(e), exc_info=e)
+                composedMessage = "No devices enrolled"
+            else:
+                composedMessage = "Name — Serial — UDID\n" + composedMessage
+            sendMessage(chat,composedMessage)
+        case "/installprofile":
+            try:
+                udid = arguments[1]
+                profileName = " ".join(arguments[2:])
+            except IndexError:
+                sendMessage(chat,"This command needs two args (udid & profile name) separated by a space")
+                return
+            if udid == "!!!ALL!!!":
+                udidQuery = '''
+                    SELECT udid
+                    FROM devices
+                    '''
+                udids = execDBQuery(udidQuery)
+                for device in udids:
+                    logging.info(device)
+                    if profileName == "!!!ALL!!!":
+                        profiles = os.listdir(PROFILES_PATH_DOCKER)
+                        for profile in profiles:
+                            installProfile(device[0],profile)
+                    else:
+                        installProfile(device[0],profileName)
+            elif profileName == "!!!ALL!!!":
+                profiles = os.listdir(PROFILES_PATH_DOCKER)
+                for profile in profiles:
+                    installProfile(udid,profile)
+            else:
+                installProfile(udid,profileName)
+            installProfile(udid,profileName)
+                
+
 
 app = Flask(__name__)
 
@@ -327,6 +336,7 @@ PROFILES_PATH_DOCKER = os.environ.get(
 )
 MICROMDM_URL = os.environ["MICROMDM_URL"]
 MICROMDM_API_PASSWORD = os.environ["MICROMDM_API_PASSWORD"]
+CREDENTIALS_ENCODED = base64.b64encode(str.encode("micromdm:"+MICROMDM_API_PASSWORD))
 RESOURCES_PATH_DOCKER = os.environ["RESOURCES_PATH_DOCKER"]
 DB_PATH = RESOURCES_PATH_DOCKER+"/db.sqlite3"
 
