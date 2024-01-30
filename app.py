@@ -1,7 +1,6 @@
 from flask import Flask, request, abort
 import requests, base64, os, sys, json, logging, sqlite3, plistlib, xml.etree.ElementTree as XML
 
-
 current_working_directory = os.getcwd()
 logging.basicConfig(
     format="%(asctime)s main %(levelname)-8s %(message)s",
@@ -194,6 +193,25 @@ def restartDevice(udid):
     response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
     logging.info(response.text)
 
+def clearPasscode(udid):
+    query = '''
+            SELECT unlockToken
+            FROM devices
+            WHERE udid = '{0}'
+            '''.format(udid)
+    unlockToken = execDBQuery(query)[0]
+    headers = {
+        'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
+        'Content-Type': 'application/json'
+        }
+    data = {
+            'udid': udid,
+            'request_type': "ClearPasscode",
+            'unlock_token': unlockToken
+        }
+    response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
+    logging.info(response.text)
+
 def installAllProfiles(udid):
     profiles = os.listdir(PROFILES_PATH_DOCKER)
     for profile in profiles:
@@ -370,7 +388,7 @@ def mdmCommand(name,chat,arguments,document):
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
             except IndexError:
-                sendMessage(chat,"This command needs device uuid to work")
+                sendMessage(chat,"This command needs device uuid as an argument to work")
                 return
             if udid[0] == "!":
                 devices = getGroupUUIDList(udid)
@@ -379,6 +397,20 @@ def mdmCommand(name,chat,arguments,document):
             for device in devices:
                 logging.info(device)
                 restartDevice(device)
+        case "/clearpasscode":
+            try:
+                udid = arguments[1]
+                profileName = " ".join(arguments[2:])
+            except IndexError:
+                sendMessage(chat,"This command needs device uuid as an argument to work")
+                return
+            if udid[0] == "!":
+                devices = getGroupUUIDList(udid)
+            else:
+                devices[0] = udid
+            for device in devices:
+                logging.info(device)
+                clearPasscode(device)            
         case _:
             sendMessage(chat,"Unknown command")
 
