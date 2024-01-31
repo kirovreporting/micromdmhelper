@@ -199,7 +199,7 @@ def clearPasscode(udid):
             FROM devices
             WHERE udid = '{0}'
             '''.format(udid)
-    unlockToken = execDBQuery(query)[0]
+    unlockToken = execDBQuery(query)[0][0]
     headers = {
         'Authorization': str.encode('Basic ')+CREDENTIALS_ENCODED,
         'Content-Type': 'application/json'
@@ -209,6 +209,7 @@ def clearPasscode(udid):
             'request_type': "ClearPasscode",
             'unlock_token': unlockToken
         }
+    logging.info(data)
     response = requests.post(MICROMDM_URL+"/v1/commands", headers=headers, data=json.dumps(data))
     logging.info(response.text)
 
@@ -275,7 +276,6 @@ def getGroupUUIDList(name):
                 devicesUUID.append(record[0])
     return devicesUUID
 
-
 def mdmCommand(name,chat,arguments,document):
     logging.info("Got command "+name)
     match name:
@@ -294,6 +294,7 @@ def mdmCommand(name,chat,arguments,document):
                 composedMessage = "Filename\n" + composedMessage
             sendMessage(chat,composedMessage)
         case "/rmprofile":
+            devices = []
             try:
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
@@ -304,7 +305,7 @@ def mdmCommand(name,chat,arguments,document):
             if udid[0] == "!":
                 devices = getGroupUUIDList(udid)
             else:
-                devices[0] = udid
+                devices.appent(udid)
             for device in devices:
                 logging.info(device)
                 if profileName == "!!!ALL!!!":
@@ -365,6 +366,7 @@ def mdmCommand(name,chat,arguments,document):
                 composedMessage = "Name — Serial — UDID\n" + composedMessage
             sendMessage(chat,composedMessage)
         case "/installprofile":
+            devices = []
             try:
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
@@ -374,7 +376,7 @@ def mdmCommand(name,chat,arguments,document):
             if udid[0] == "!":
                 devices = getGroupUUIDList(udid)
             else:
-                devices[0] = udid
+                devices.append(udid)
             for device in devices:
                 logging.info(device)
                 if profileName == "!all":
@@ -384,6 +386,7 @@ def mdmCommand(name,chat,arguments,document):
                 else:
                     installProfile(device,profileName)
         case "/restartdevice":
+            devices = []
             try:
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
@@ -393,11 +396,12 @@ def mdmCommand(name,chat,arguments,document):
             if udid[0] == "!":
                 devices = getGroupUUIDList(udid)
             else:
-                devices[0] = udid
+                devices.append(udid)
             for device in devices:
                 logging.info(device)
                 restartDevice(device)
         case "/clearpasscode":
+            devices = []
             try:
                 udid = arguments[1]
                 profileName = " ".join(arguments[2:])
@@ -407,7 +411,7 @@ def mdmCommand(name,chat,arguments,document):
             if udid[0] == "!":
                 devices = getGroupUUIDList(udid)
             else:
-                devices[0] = udid
+                devices.append(udid)
             for device in devices:
                 logging.info(device)
                 clearPasscode(device)            
